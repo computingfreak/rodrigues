@@ -65,12 +65,12 @@ function initGame(type) {
   render();
 }
 
-function top(pile) { return pile[pile.length - 1]; }
+function topCard(pile) { return pile[pile.length - 1]; }
 
 function canMoveToFoundation(card, foundation) {
   if (!card) return false;
   if (!foundation.length) return card.value === 1;
-  const t = top(foundation);
+  const t = topCard(foundation);
   return t.suit === card.suit && card.value === t.value + 1;
 }
 
@@ -96,7 +96,7 @@ function applyMove(from, to) {
   const dst = resolvePile(to);
   if (!src || !dst || !src.length) return false;
 
-  const card = top(src);
+  const card = topCard(src);
   if (!card.faceUp && state.type !== "freecell") return false;
 
   if (to.kind === "foundation") {
@@ -105,11 +105,11 @@ function applyMove(from, to) {
     if (to.kind === "freecell") {
       if (dst.length) return false;
     } else if (to.kind === "column") {
-      if (!canStackFreeCell(card, top(dst))) return false;
+      if (!canStackFreeCell(card, topCard(dst))) return false;
     }
   } else {
     if (to.kind === "tableau") {
-      if (!canStackDescendingAlt(card, top(dst))) return false;
+      if (!canStackDescendingAlt(card, topCard(dst))) return false;
     } else {
       return false;
     }
@@ -139,7 +139,7 @@ function resolvePile(ref) {
 function autoFlip() {
   if (state.type === "freecell") return;
   state.tableau.forEach((pile) => {
-    if (pile.length && !top(pile).faceUp) top(pile).faceUp = true;
+    if (pile.length && !topCard(pile).faceUp) topCard(pile).faceUp = true;
   });
 }
 
@@ -164,7 +164,7 @@ function clickPile(targetRef) {
   }
 
   if (pile.length) {
-    const candidate = top(pile);
+    const candidate = topCard(pile);
     if (candidate.faceUp || state.type === "freecell") selectSource(targetRef);
   }
 }
@@ -205,9 +205,9 @@ function pileEl(label, cards, ref, showAll = true) {
 
   if (!cards.length) return el;
 
-  const displayCards = showAll ? cards : [top(cards)];
+  const displayCards = showAll ? cards : [topCard(cards)];
   displayCards.forEach((card) => {
-    const isSelected = selected && selected.kind === ref.kind && selected.index === ref.index && card === top(cards);
+    const isSelected = selected && selected.kind === ref.kind && selected.index === ref.index && card === topCard(cards);
     el.appendChild(cardEl(card, isSelected));
   });
   return el;
@@ -269,7 +269,7 @@ function findHint() {
     });
   } else {
     if (state.waste.length) refs.push({ kind: "waste", index: 0 });
-    state.tableau.forEach((p, i) => p.length && top(p).faceUp && refs.push({ kind: "tableau", index: i }));
+    state.tableau.forEach((p, i) => p.length && topCard(p).faceUp && refs.push({ kind: "tableau", index: i }));
     refs.forEach((from) => {
       state.foundations.forEach((_, i) => applyHypothetical(from, { kind: "foundation", index: i }, moves));
       state.tableau.forEach((_, i) => applyHypothetical(from, { kind: "tableau", index: i }, moves));
@@ -284,11 +284,11 @@ function applyHypothetical(from, to, moves) {
   const src = resolvePile(from);
   const dst = resolvePile(to);
   if (!src || !src.length || !dst) return;
-  const card = top(src);
+  const card = topCard(src);
   let legal = false;
   if (to.kind === "foundation") legal = canMoveToFoundation(card, dst);
-  else if (state.type === "freecell") legal = to.kind === "freecell" ? !dst.length : canStackFreeCell(card, top(dst));
-  else legal = to.kind === "tableau" && canStackDescendingAlt(card, top(dst));
+  else if (state.type === "freecell") legal = to.kind === "freecell" ? !dst.length : canStackFreeCell(card, topCard(dst));
+  else legal = to.kind === "tableau" && canStackDescendingAlt(card, topCard(dst));
   if (legal) moves.push(`Try moving ${card.rank}${card.suit} from ${from.kind} ${from.index + 1} to ${to.kind} ${to.index + 1}.`);
 }
 
