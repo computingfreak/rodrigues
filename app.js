@@ -131,7 +131,12 @@ function undoLastOperation() {
 }
 
 function isSameRef(a, b) {
-  return a && b && a.kind === b.kind && a.index === b.index;
+  if (!a || !b) return false;
+  if (a.kind !== b.kind || a.index !== b.index) return false;
+  const aHasCardIndex = typeof a.cardIndex === "number";
+  const bHasCardIndex = typeof b.cardIndex === "number";
+  if (!aHasCardIndex && !bHasCardIndex) return true;
+  return a.cardIndex === b.cardIndex;
 }
 
 function canApplyMove(from, to) {
@@ -344,6 +349,13 @@ function cardEl(card, options = {}) {
     });
   }
 
+  if (ref) {
+    el.addEventListener("click", (event) => {
+      event.stopPropagation();
+      clickPile(ref);
+    });
+  }
+
   if (isTop && ref) {
     el.addEventListener("dblclick", (event) => {
       event.stopPropagation();
@@ -490,5 +502,18 @@ hintBtn.addEventListener("click", () => {
 });
 
 initGame("klondike");
+
+if (typeof window !== "undefined") {
+  window.__solitaireTest = {
+    clickPile,
+    getSelected: () => selected,
+    isSameRef,
+    setState: (nextState) => {
+      state = nextState;
+      render();
+    },
+    getState: () => state,
+  };
+}
 
 })();
