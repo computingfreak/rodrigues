@@ -7,12 +7,14 @@ const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"]
 const gameSelect = document.getElementById("gameSelect");
 const newGameBtn = document.getElementById("newGameBtn");
 const hintBtn = document.getElementById("hintBtn");
+const undoBtn = document.getElementById("undoBtn");
 const boardEl = document.getElementById("board");
 const statusEl = document.getElementById("status");
 
 let state = null;
 let selected = null;
 let draggedRef = null;
+let history = [];
 
 function shuffledDeck() {
   const deck = [];
@@ -34,6 +36,8 @@ function cardColor(c) {
 
 function initGame(type) {
   selected = null;
+  draggedRef = null;
+  history = [];
   const deck = shuffledDeck();
   if (type === "freecell") {
     state = {
@@ -95,6 +99,29 @@ function selectSource(ref) {
 
 function clearSelection() { selected = null; }
 
+function cloneCurrentState() {
+  return JSON.parse(JSON.stringify(state));
+}
+
+function rememberState() {
+  if (!state) return;
+  history.push(cloneCurrentState());
+  if (history.length > 200) history.shift();
+}
+
+function undoLastOperation() {
+  const previous = history.pop();
+  if (!previous) {
+    statusEl.textContent = "Nothing to undo.";
+    return;
+  }
+  state = previous;
+  selected = null;
+  draggedRef = null;
+  render();
+  statusEl.textContent = "Undid last operation.";
+}
+
 function isSameRef(a, b) {
   return a && b && a.kind === b.kind && a.index === b.index;
 }
@@ -123,6 +150,7 @@ function canApplyMove(from, to) {
 function applyMove(from, to) {
   if (!canApplyMove(from, to)) return false;
 
+  rememberState();
   const src = resolvePile(from);
   const dst = resolvePile(to);
 
@@ -192,6 +220,9 @@ function moveToFirstFoundation(fromRef) {
 }
 
 function drawFromStock() {
+  if (!state.stock.length && !state.waste.length) return;
+
+  rememberState();
   if (!state.stock.length) {
     while (state.waste.length) {
       const c = state.waste.pop();
@@ -364,6 +395,7 @@ function render() {
 }
 
 newGameBtn.addEventListener("click", () => initGame(gameSelect.value));
+undoBtn.addEventListener("click", undoLastOperation);
 hintBtn.addEventListener("click", () => {
   statusEl.textContent = findHint();
 });

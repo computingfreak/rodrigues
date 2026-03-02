@@ -96,9 +96,20 @@ button, select {
   user-select: none;
 }
 
+.pile.tableau-pile .card,
+.pile.column-pile .card {
+  position: relative;
+  box-shadow: 0 0 0 1px #1d1d1d;
+}
+
 .pile.tableau-pile .card + .card,
 .pile.column-pile .card + .card {
   margin-top: -72px;
+}
+
+.pile.tableau-pile .card:last-child,
+.pile.column-pile .card:last-child {
+  z-index: 2;
 }
 
 .card.red { color: #b51515; }
