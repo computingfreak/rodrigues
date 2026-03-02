@@ -132,7 +132,9 @@ function canApplyMove(from, to) {
   const dst = resolvePile(to);
   if (!src || !dst || !src.length) return false;
 
-  const card = topCard(src);
+  const movingCards = getMovingCards(from);
+  if (!movingCards.length) return false;
+  const card = movingCards[0];
   if (!card.faceUp && state.type !== "freecell") return false;
 
   if (to.kind === "foundation") return canMoveToFoundation(card, dst);
@@ -153,12 +155,29 @@ function applyMove(from, to) {
   rememberState();
   const src = resolvePile(from);
   const dst = resolvePile(to);
-
-  dst.push(src.pop());
+  const movingCards = getMovingCards(from);
+  if (!movingCards.length) return false;
+  const startIndex = src.length - movingCards.length;
+  src.splice(startIndex, movingCards.length);
+  dst.push(...movingCards);
   autoFlip();
   clearSelection();
   render();
   return true;
+}
+
+function getMovingCards(ref) {
+  const pile = resolvePile(ref);
+  if (!pile || !pile.length) return [];
+  if (state.type !== "freecell" && ref.kind === "tableau" && typeof ref.cardIndex === "number") {
+    const moving = pile.slice(ref.cardIndex);
+    if (!moving.length || !moving.every((card) => card.faceUp)) return [];
+    for (let i = 0; i < moving.length - 1; i++) {
+      if (!canStackDescendingAlt(moving[i + 1], moving[i])) return [];
+    }
+    return moving;
+  }
+  return [topCard(pile)];
 }
 
 function resolvePile(ref) {
@@ -208,7 +227,9 @@ function clickPile(targetRef) {
 function canSelectSource(ref) {
   const pile = resolvePile(ref);
   if (!pile || !pile.length) return false;
-  const candidate = topCard(pile);
+  const candidate = state.type !== "freecell" && ref.kind === "tableau" && typeof ref.cardIndex === "number"
+    ? pile[ref.cardIndex]
+    : topCard(pile);
   return state.type === "freecell" || candidate.faceUp;
 }
 
@@ -298,10 +319,14 @@ function pileEl(label, cards, ref, showAll = true) {
 
   const displayCards = showAll ? cards : [topCard(cards)];
   displayCards.forEach((card) => {
+    const cardIndex = cards.indexOf(card);
+    const cardRef = ref.kind === "tableau" ? { ...ref, cardIndex } : ref;
     const isTop = card === topCard(cards);
-    const isSelected = selected && selected.kind === ref.kind && selected.index === ref.index && isTop;
-    const isDraggable = isTop && canSelectSource(ref);
-    el.appendChild(cardEl(card, { isSelected, isDraggable, ref, isTop }));
+    const isSelected = selected && selected.kind === ref.kind && selected.index === ref.index && selected.cardIndex === cardRef.cardIndex;
+    const isDraggable = state.type !== "freecell" && ref.kind === "tableau"
+      ? canSelectSource(cardRef)
+      : isTop && canSelectSource(cardRef);
+    el.appendChild(cardEl(card, { isSelected, isDraggable, ref: cardRef, isTop }));
   });
   return el;
 }
