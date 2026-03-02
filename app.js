@@ -10,11 +10,15 @@ const hintBtn = document.getElementById("hintBtn");
 const undoBtn = document.getElementById("undoBtn");
 const boardEl = document.getElementById("board");
 const statusEl = document.getElementById("status");
+const timerValueEl = document.getElementById("timerValue");
+const movesValueEl = document.getElementById("movesValue");
+const scoreValueEl = document.getElementById("scoreValue");
 
 let state = null;
 let selected = null;
 let draggedRef = null;
 let history = [];
+let timerHandle = null;
 
 function shuffledDeck() {
   const deck = [];
@@ -38,10 +42,12 @@ function initGame(type) {
   selected = null;
   draggedRef = null;
   history = [];
+  stopTimer();
   const deck = shuffledDeck();
   if (type === "freecell") {
     state = {
       type,
+      stats: { elapsedSeconds: 0, moves: 0, score: 0 },
       freecells: [[], [], [], []],
       foundations: [[], [], [], []],
       columns: Array.from({ length: 8 }, () => []),
@@ -52,6 +58,7 @@ function initGame(type) {
     state = {
       type,
       drawCount,
+      stats: { elapsedSeconds: 0, moves: 0, score: 0 },
       stock: [],
       waste: [],
       foundations: [[], [], [], []],
@@ -70,6 +77,7 @@ function initGame(type) {
       state.stock.push(card);
     }
   }
+  startTimer();
   render();
 }
 
@@ -160,6 +168,8 @@ function applyMove(from, to) {
   const startIndex = src.length - movingCards.length;
   src.splice(startIndex, movingCards.length);
   dst.push(...movingCards);
+  scoreMove(from, to);
+  incrementMoves();
   autoFlip();
   clearSelection();
   render();
@@ -169,7 +179,24 @@ function applyMove(from, to) {
 function getMovingCards(ref) {
   const pile = resolvePile(ref);
   if (!pile || !pile.length) return [];
+  if (state.type !== "freecell" && ref.kind === "tableau") {
+    const cardIndex = typeof ref.cardIndex === "number" ? ref.cardIndex : pile.length - 1;
+    if (cardIndex < 0 || cardIndex >= pile.length) return [];
+    const segment = pile.slice(cardIndex);
+    return isValidTableauRun(segment) ? segment : [];
+  }
   return [topCard(pile)];
+}
+
+function isValidTableauRun(cards) {
+  if (!cards.length) return false;
+  if (cards.some((card) => !card.faceUp)) return false;
+  for (let i = 0; i < cards.length - 1; i++) {
+    const current = cards[i];
+    const next = cards[i + 1];
+    if (current.value !== next.value + 1 || cardColor(current) === cardColor(next)) return false;
+  }
+  return true;
 }
 
 function resolvePile(ref) {
@@ -189,7 +216,10 @@ function resolvePile(ref) {
 function autoFlip() {
   if (state.type === "freecell") return;
   state.tableau.forEach((pile) => {
-    if (pile.length && !topCard(pile).faceUp) topCard(pile).faceUp = true;
+    if (pile.length && !topCard(pile).faceUp) {
+      topCard(pile).faceUp = true;
+      state.stats.score += 5;
+    }
   });
 }
 
@@ -220,7 +250,10 @@ function canSelectSource(ref) {
   const pile = resolvePile(ref);
   if (!pile || !pile.length) return false;
   if (state.type === "freecell") return true;
-  if (ref.kind === "tableau" && typeof ref.cardIndex === "number" && ref.cardIndex !== pile.length - 1) return false;
+  if (ref.kind === "tableau" && typeof ref.cardIndex === "number") {
+    const segment = pile.slice(ref.cardIndex);
+    return isValidTableauRun(segment);
+  }
   return topCard(pile).faceUp;
 }
 
@@ -235,6 +268,7 @@ function drawFromStock() {
   if (!state.stock.length && !state.waste.length) return;
 
   rememberState();
+  incrementMoves();
   if (!state.stock.length) {
     while (state.waste.length) {
       const c = state.waste.pop();
@@ -248,6 +282,44 @@ function drawFromStock() {
     c.faceUp = true;
     state.waste.push(c);
   }
+  state.stats.score = Math.max(0, state.stats.score - 1);
+}
+
+function incrementMoves() {
+  state.stats.moves += 1;
+}
+
+function scoreMove(from, to) {
+  if (to.kind === "foundation") state.stats.score += 10;
+  if (from.kind === "foundation" && to.kind !== "foundation") state.stats.score = Math.max(0, state.stats.score - 15);
+}
+
+function formatTime(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+  return `${minutes}:${seconds}`;
+}
+
+function updateStatsUI() {
+  if (!state || !state.stats) return;
+  timerValueEl.textContent = formatTime(state.stats.elapsedSeconds);
+  movesValueEl.textContent = String(state.stats.moves);
+  scoreValueEl.textContent = String(state.stats.score);
+}
+
+function startTimer() {
+  stopTimer();
+  timerHandle = setInterval(() => {
+    if (!state || !state.stats || isWon()) return;
+    state.stats.elapsedSeconds += 1;
+    updateStatsUI();
+  }, 1000);
+}
+
+function stopTimer() {
+  if (!timerHandle) return;
+  clearInterval(timerHandle);
+  timerHandle = null;
 }
 
 function cardEl(card, options = {}) {
@@ -405,6 +477,7 @@ function render() {
   if (!state) return;
   if (state.type === "freecell") renderFreecell();
   else renderKlondike();
+  updateStatsUI();
 
   if (isWon()) statusEl.textContent = "🎉 You won!";
   else statusEl.textContent = "";

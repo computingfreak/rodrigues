@@ -44,6 +44,18 @@ button, select {
   padding: 0.45rem 0.7rem;
 }
 
+.stats {
+  display: flex;
+  gap: 0.75rem;
+  margin-left: auto;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.stats strong {
+  color: var(--text);
+}
+
 .board {
   display: grid;
   gap: 0.8rem;
