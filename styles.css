@@ -17,7 +17,7 @@ body {
 }
 
 .app {
-  max-width: 1200px;
+  width: min(96vw, 1680px);
   margin: 0 auto;
   padding: 1rem;
 }
@@ -47,6 +47,7 @@ button, select {
 .board {
   display: grid;
   gap: 0.8rem;
+  overflow-x: auto;
 }
 
 .row {
@@ -64,6 +65,11 @@ button, select {
   padding: 0.3rem;
   position: relative;
   background: rgba(0,0,0,0.15);
+}
+
+.pile.tableau-pile,
+.pile.column-pile {
+  min-height: 420px;
 }
 
 .pile-label {
@@ -88,6 +94,26 @@ button, select {
   margin-bottom: 0.25rem;
   cursor: pointer;
   user-select: none;
+}
+
+.pile.tableau-pile .card,
+.pile.column-pile .card {
+  position: relative;
+  box-shadow: 0 0 0 1px #1d1d1d;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: 0.35rem 0.4rem;
+  line-height: 1;
+}
+
+.pile.tableau-pile .card + .card,
+.pile.column-pile .card + .card {
+  margin-top: -72px;
+}
+
+.pile.tableau-pile .card:last-child,
+.pile.column-pile .card:last-child {
+  z-index: 2;
 }
 
 .card.red { color: #b51515; }
