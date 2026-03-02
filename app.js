@@ -169,14 +169,6 @@ function applyMove(from, to) {
 function getMovingCards(ref) {
   const pile = resolvePile(ref);
   if (!pile || !pile.length) return [];
-  if (state.type !== "freecell" && ref.kind === "tableau" && typeof ref.cardIndex === "number") {
-    const moving = pile.slice(ref.cardIndex);
-    if (!moving.length || !moving.every((card) => card.faceUp)) return [];
-    for (let i = 0; i < moving.length - 1; i++) {
-      if (!canStackDescendingAlt(moving[i + 1], moving[i])) return [];
-    }
-    return moving;
-  }
   return [topCard(pile)];
 }
 
@@ -227,10 +219,9 @@ function clickPile(targetRef) {
 function canSelectSource(ref) {
   const pile = resolvePile(ref);
   if (!pile || !pile.length) return false;
-  const candidate = state.type !== "freecell" && ref.kind === "tableau" && typeof ref.cardIndex === "number"
-    ? pile[ref.cardIndex]
-    : topCard(pile);
-  return state.type === "freecell" || candidate.faceUp;
+  if (state.type === "freecell") return true;
+  if (ref.kind === "tableau" && typeof ref.cardIndex === "number" && ref.cardIndex !== pile.length - 1) return false;
+  return topCard(pile).faceUp;
 }
 
 function moveToFirstFoundation(fromRef) {
