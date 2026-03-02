@@ -12,6 +12,7 @@ const statusEl = document.getElementById("status");
 
 let state = null;
 let selected = null;
+let draggedRef = null;
 
 function shuffledDeck() {
   const deck = [];
@@ -94,7 +95,12 @@ function selectSource(ref) {
 
 function clearSelection() { selected = null; }
 
-function applyMove(from, to) {
+function isSameRef(a, b) {
+  return a && b && a.kind === b.kind && a.index === b.index;
+}
+
+function canApplyMove(from, to) {
+  if (!from || !to || isSameRef(from, to)) return false;
   const src = resolvePile(from);
   const dst = resolvePile(to);
   if (!src || !dst || !src.length) return false;
@@ -102,21 +108,23 @@ function applyMove(from, to) {
   const card = topCard(src);
   if (!card.faceUp && state.type !== "freecell") return false;
 
-  if (to.kind === "foundation") {
-    if (!canMoveToFoundation(card, dst)) return false;
-  } else if (state.type === "freecell") {
-    if (to.kind === "freecell") {
-      if (dst.length) return false;
-    } else if (to.kind === "column") {
-      if (!canStackFreeCell(card, topCard(dst))) return false;
-    }
-  } else {
-    if (to.kind === "tableau") {
-      if (!canStackDescendingAlt(card, topCard(dst))) return false;
-    } else {
-      return false;
-    }
+  if (to.kind === "foundation") return canMoveToFoundation(card, dst);
+
+  if (state.type === "freecell") {
+    if (to.kind === "freecell") return !dst.length;
+    if (to.kind === "column") return canStackFreeCell(card, topCard(dst));
+    return false;
   }
+
+  if (to.kind !== "tableau") return false;
+  return canStackDescendingAlt(card, topCard(dst));
+}
+
+function applyMove(from, to) {
+  if (!canApplyMove(from, to)) return false;
+
+  const src = resolvePile(from);
+  const dst = resolvePile(to);
 
   dst.push(src.pop());
   autoFlip();
@@ -158,7 +166,7 @@ function clickPile(targetRef) {
   if (!pile) return;
 
   if (selected) {
-    if (selected.kind === targetRef.kind && selected.index === targetRef.index) {
+    if (isSameRef(selected, targetRef)) {
       clearSelection();
       render();
       return;
@@ -166,10 +174,21 @@ function clickPile(targetRef) {
     if (applyMove(selected, targetRef)) return;
   }
 
-  if (pile.length) {
-    const candidate = topCard(pile);
-    if (candidate.faceUp || state.type === "freecell") selectSource(targetRef);
+  if (canSelectSource(targetRef)) selectSource(targetRef);
+}
+
+function canSelectSource(ref) {
+  const pile = resolvePile(ref);
+  if (!pile || !pile.length) return false;
+  const candidate = topCard(pile);
+  return state.type === "freecell" || candidate.faceUp;
+}
+
+function moveToFirstFoundation(fromRef) {
+  for (let i = 0; i < state.foundations.length; i++) {
+    if (applyMove(fromRef, { kind: "foundation", index: i })) return true;
   }
+  return false;
 }
 
 function drawFromStock() {
@@ -188,18 +207,56 @@ function drawFromStock() {
   }
 }
 
-function cardEl(card, isSelected = false) {
+function cardEl(card, options = {}) {
+  const { isSelected = false, isDraggable = false, ref = null, isTop = false } = options;
   const el = document.createElement("div");
   el.className = `card ${cardColor(card)} ${card.faceUp ? "" : "back"} ${isSelected ? "selected" : ""}`.trim();
   el.textContent = card.faceUp ? `${card.rank}${card.suit}` : "##";
+
+  if (isDraggable) {
+    el.draggable = true;
+    el.addEventListener("dragstart", (event) => {
+      draggedRef = ref;
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", JSON.stringify(ref));
+      }
+      el.classList.add("selected");
+    });
+    el.addEventListener("dragend", () => {
+      draggedRef = null;
+      render();
+    });
+  }
+
+  if (isTop && ref) {
+    el.addEventListener("dblclick", (event) => {
+      event.stopPropagation();
+      moveToFirstFoundation(ref);
+    });
+  }
+
   return el;
 }
 
 function pileEl(label, cards, ref, showAll = true) {
   const el = document.createElement("div");
-  el.className = "pile";
+  el.className = `pile ${ref.kind}-pile`;
   if (selected && selected.kind === ref.kind && selected.index === ref.index) el.classList.add("highlight");
   el.onclick = () => clickPile(ref);
+  el.addEventListener("dragover", (event) => {
+    const fromRef = draggedRef;
+    if (fromRef && canApplyMove(fromRef, ref)) {
+      event.preventDefault();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    }
+  });
+  el.addEventListener("drop", (event) => {
+    event.preventDefault();
+    const fromRef = draggedRef;
+    draggedRef = null;
+    if (fromRef) applyMove(fromRef, ref);
+  });
 
   const lbl = document.createElement("div");
   lbl.className = "pile-label";
@@ -210,8 +267,10 @@ function pileEl(label, cards, ref, showAll = true) {
 
   const displayCards = showAll ? cards : [topCard(cards)];
   displayCards.forEach((card) => {
-    const isSelected = selected && selected.kind === ref.kind && selected.index === ref.index && card === topCard(cards);
-    el.appendChild(cardEl(card, isSelected));
+    const isTop = card === topCard(cards);
+    const isSelected = selected && selected.kind === ref.kind && selected.index === ref.index && isTop;
+    const isDraggable = isTop && canSelectSource(ref);
+    el.appendChild(cardEl(card, { isSelected, isDraggable, ref, isTop }));
   });
   return el;
 }
